@@ -39,7 +39,7 @@ pub struct Cli {
     #[arg(
         long = "postgres-conn-string",
         value_name = "string",
-        help = "for example, \"host=localhost user=postgres\""
+        help = "for example, \"host=localhost user=postgres\", to specify your own DB use dbname=your_db_name otherwise DB will be created"
     )]
     postgres_conn_string: String,
     #[arg(
