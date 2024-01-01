@@ -1,32 +1,3 @@
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Sex {
-    Male,
-    Female,
-}
-
-impl ToString for Sex {
-    fn to_string(&self) -> String {
-        match self {
-            Self::Female => "female".into(),
-            Self::Male => "male".into(),
-        }
-    }
-}
-
-impl From<String> for Sex {
-    fn from(value: String) -> Self {
-        match value.as_str() {
-            "female" => Self::Female,
-            "male" => Self::Male,
-            v => {
-                tracing::error!("BUG: not possible value {}", v);
-                unreachable!()
-            }
-        }
-    }
-}
-
 pub struct DB {
     client: tokio_postgres::Client,
 }
