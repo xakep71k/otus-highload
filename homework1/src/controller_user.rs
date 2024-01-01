@@ -1,16 +1,16 @@
-use crate::{db, password::hash_password, schema};
+use crate::{db_client, db_user, password::hash_password, schema};
 use axum::{extract, http::StatusCode, response::IntoResponse, Json};
 use chrono::Datelike;
 use std::sync::Arc;
 
 pub async fn create_user(
-    extract::State(db): extract::State<Arc<db::DB>>,
+    extract::State(db): extract::State<Arc<db_client::DB>>,
     Json(payload): Json<serde_json::Value>,
 ) -> impl IntoResponse {
     match validate_create_user_request(&payload) {
         Err(err) => (StatusCode::BAD_REQUEST, err.to_string()),
         Ok(user) => {
-            let user: db::User = user.into();
+            let user: db_user::User = user.into();
             match user.insert_to_db(&db).await {
                 Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
                 Ok(id) => {
@@ -23,10 +23,10 @@ pub async fn create_user(
 }
 
 pub async fn get_user(
-    extract::State(db): extract::State<Arc<db::DB>>,
+    extract::State(db): extract::State<Arc<db_client::DB>>,
     extract::Path(id): extract::Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    match db::User::from_db(id, &db).await {
+    match db_user::User::from_db(id, &db).await {
         Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string())),
         Ok(user) => match user {
             Some(user) => Ok((StatusCode::OK, Json::<GetUser>(user.into()))),
@@ -85,8 +85,8 @@ struct GetUser {
     city: String,
 }
 
-impl From<db::User> for GetUser {
-    fn from(user: db::User) -> Self {
+impl From<db_user::User> for GetUser {
+    fn from(user: db_user::User) -> Self {
         Self {
             id: user.id,
             first_name: user.first_name,
@@ -98,7 +98,7 @@ impl From<db::User> for GetUser {
     }
 }
 
-impl From<CreateUser> for db::User {
+impl From<CreateUser> for db_user::User {
     fn from(user: CreateUser) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),

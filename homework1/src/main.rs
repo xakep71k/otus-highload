@@ -1,8 +1,9 @@
 mod app;
-mod db;
+mod controller_user;
+mod db_client;
+mod db_user;
 mod password;
 mod schema;
-mod user_controller;
 
 use app::App;
 use clap::{arg, Parser};
