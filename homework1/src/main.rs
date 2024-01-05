@@ -1,4 +1,6 @@
 mod app;
+mod controller;
+mod controller_auth;
 mod controller_user;
 mod db_client;
 mod db_user;

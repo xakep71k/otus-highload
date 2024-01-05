@@ -80,7 +80,7 @@ impl DB {
 
     async fn apply_migrations(client: &tokio_postgres::Client) -> anyhow::Result<()> {
         client
-            .query(&format!("create table if not exists {TABLE_USERS} (id text PRIMARY KEY, first_name text, second_name text, birthdate text, biography text, city text, password_hash text)"), &[])
+            .query(&format!("create table if not exists {TABLE_USERS} (id text PRIMARY KEY, first_name text, second_name text, birthdate text, biography text, city text, password_hash text, token text)"), &[])
             .await
             .map_err(|e| anyhow::anyhow!("failed to create table '{}': {}", TABLE_USERS, e))?;
         tracing::info!("migrations applied");

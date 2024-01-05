@@ -2,16 +2,17 @@ use crate::{db_client, db_user, password::hash_password, schema};
 use axum::{extract, http::StatusCode, response::IntoResponse, Json};
 use chrono::Datelike;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
 pub async fn create_user(
-    extract::State(db): extract::State<Arc<db_client::DB>>,
+    extract::State(db): extract::State<Arc<RwLock<db_client::DB>>>,
     Json(payload): Json<serde_json::Value>,
 ) -> impl IntoResponse {
     match validate_create_user_request(&payload) {
         Err(err) => (StatusCode::BAD_REQUEST, err.to_string()),
         Ok(user) => {
             let user: db_user::User = user.into();
-            match user.insert_to_db(&db).await {
+            match user.insert_to_db(&*db.read().await).await {
                 Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
                 Ok(id) => {
                     tracing::info!("a new user registered with ID {}", id);
@@ -23,10 +24,10 @@ pub async fn create_user(
 }
 
 pub async fn get_user(
-    extract::State(db): extract::State<Arc<db_client::DB>>,
+    extract::State(db): extract::State<Arc<RwLock<db_client::DB>>>,
     extract::Path(id): extract::Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    match db_user::User::from_db(id, &db).await {
+    match db_user::User::from_id(&id, &db.read().await.client).await {
         Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string())),
         Ok(user) => match user {
             Some(user) => Ok((StatusCode::OK, Json::<GetUser>(user.into()))),
@@ -65,7 +66,7 @@ impl CreateUser {
         let birthdate = self.birthdate.as_str();
         if birthdate > date_18_old.as_str() {
             anyhow::bail!(
-                "you must be 18 year old or over: but now {} > {}",
+                "you must be 18 year old or over: but {} > {}",
                 birthdate,
                 date_18_old
             )
@@ -108,6 +109,7 @@ impl From<CreateUser> for db_user::User {
             biography: user.biography,
             city: user.city,
             password_hash: hash_password(user.password.as_str()),
+            token: String::new(),
         }
     }
 }

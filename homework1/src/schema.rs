@@ -1,6 +1,15 @@
 use jsonschema::{Draft, JSONSchema};
 use once_cell::sync::Lazy;
 
+pub static LOGIN: Lazy<JSONSchema> = Lazy::new(|| {
+    let schema = include_str!("schema/login.json");
+    let schema: serde_json::Value = serde_json::from_str(schema).unwrap();
+    JSONSchema::options()
+        .with_draft(Draft::Draft7)
+        .compile(&schema)
+        .expect("A valid schema")
+});
+
 pub static USER_REGISTER: Lazy<JSONSchema> = Lazy::new(|| {
     let schema = include_str!("schema/user_register.json");
     let schema: serde_json::Value = serde_json::from_str(schema).unwrap();
