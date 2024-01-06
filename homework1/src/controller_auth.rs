@@ -33,7 +33,7 @@ pub async fn login(
 ) -> impl IntoResponse {
     let response: (StatusCode, Json<serde_json::Value>) = match validate_login_request(&payload) {
         Err(err) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
+            StatusCode::BAD_REQUEST,
             serde_json::Value::from(controller::Error {
                 message: err.to_string(),
             })
