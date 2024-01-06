@@ -1,11 +1,11 @@
-use crate::{controller, db_client, db_user, password::hash_password, schema};
+use crate::{controller, db, db_user, password::hash_password, schema};
 use axum::{extract, http::StatusCode, response::IntoResponse, Json};
 use chrono::Datelike;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio_postgres::GenericClient;
 
 pub async fn create_user(
-    extract::State(db): extract::State<Arc<RwLock<db_client::DB>>>,
+    extract::State(db): extract::State<Arc<db::DB>>,
     Json(payload): Json<serde_json::Value>,
 ) -> impl IntoResponse {
     let response: (StatusCode, Json<serde_json::Value>) =
@@ -19,7 +19,7 @@ pub async fn create_user(
             ),
             Ok(user) => {
                 let user: db_user::User = user.into();
-                match user.insert_to_db(&*db.read().await).await {
+                match user.insert_to_db(&db).await {
                     Err(err) => (
                         StatusCode::INTERNAL_SERVER_ERROR,
                         serde_json::Value::from(controller::Error {
@@ -42,11 +42,23 @@ pub async fn create_user(
 }
 
 pub async fn get_user(
-    extract::State(db): extract::State<Arc<RwLock<db_client::DB>>>,
+    extract::State(db): extract::State<Arc<db::DB>>,
     extract::Path(id): extract::Path<String>,
 ) -> impl IntoResponse {
+    let pg_pool = match db.get().await {
+        Err(err) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json::<serde_json::Value>(serde_json::Value::from(controller::Error {
+                    message: err.to_string(),
+                })),
+            )
+        }
+        Ok(object) => object,
+    };
+
     let response: (StatusCode, Json<serde_json::Value>) =
-        match db_user::User::from_id(&id, &db.read().await.client).await {
+        match db_user::User::from_id(&id, pg_pool.client()).await {
             Err(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 serde_json::Value::from(controller::Error {

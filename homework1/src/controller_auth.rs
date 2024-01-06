@@ -1,7 +1,6 @@
-use crate::{controller, db_client, db_user, schema};
+use crate::{controller, db, db_user, schema};
 use axum::{extract, http::StatusCode, response::IntoResponse, Json};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
 #[derive(Debug, serde::Deserialize, Clone)]
 struct Login {
@@ -29,7 +28,7 @@ fn validate_login_request(payload: &serde_json::Value) -> anyhow::Result<Login> 
 }
 
 pub async fn login(
-    extract::State(db): extract::State<Arc<RwLock<db_client::DB>>>,
+    extract::State(db): extract::State<Arc<db::DB>>,
     Json(payload): Json<serde_json::Value>,
 ) -> impl IntoResponse {
     let response: (StatusCode, Json<serde_json::Value>) = match validate_login_request(&payload) {
@@ -41,12 +40,20 @@ pub async fn login(
             .into(),
         ),
         Ok(login) => {
-            match db_user::User::update_token(
-                &login.user_id,
-                &login.user_password,
-                &mut db.write().await.client,
-            )
-            .await
+            let mut pg_pool = match db.get().await {
+                Err(err) => {
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json::<serde_json::Value>(serde_json::Value::from(controller::Error {
+                            message: err.to_string(),
+                        })),
+                    )
+                }
+                Ok(object) => object,
+            };
+
+            match db_user::User::update_token(&login.user_id, &login.user_password, &mut pg_pool)
+                .await
             {
                 Err(err) => (
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -69,7 +76,7 @@ fn update_token_result_to_resonse(
     use db_user::UpdatedTokenResult;
     match result {
         UpdatedTokenResult::Ok(user) => {
-            tracing::error!("user with id '{}' has been login successfuly", user_id,);
+            tracing::info!("user with id '{}' has been login successfuly", user_id,);
             (
                 StatusCode::OK,
                 serde_json::Value::from(Token { token: user.token }).into(),

@@ -1,4 +1,4 @@
-use crate::{db_client::DB, password};
+use crate::{db::DB, password};
 
 #[derive(serde::Serialize)]
 pub struct User {
@@ -15,7 +15,8 @@ pub struct User {
 impl User {
     pub async fn insert_to_db(self, db: &DB) -> anyhow::Result<String> {
         let statement = "INSERT INTO users (id, first_name, second_name, birthdate, biography, city, password_hash, token) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)";
-        db.client
+        db.get()
+            .await?
             .execute(
                 statement,
                 &[
@@ -67,10 +68,10 @@ impl User {
     pub async fn update_token(
         user_id: &String,
         password: &str,
-        client: &mut tokio_postgres::Client,
+        pg_pool: &mut deadpool_postgres::Object,
     ) -> anyhow::Result<UpdatedTokenResult> {
         let token = uuid::Uuid::new_v4().to_string();
-        let transaction = client
+        let transaction = pg_pool
             .transaction()
             .await
             .map_err(|e| anyhow::anyhow!("failed to update token: transaction error: {}", e))?;

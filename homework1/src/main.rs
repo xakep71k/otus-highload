@@ -2,7 +2,7 @@ mod app;
 mod controller;
 mod controller_auth;
 mod controller_user;
-mod db_client;
+mod db;
 mod db_user;
 mod password;
 mod schema;
@@ -16,7 +16,13 @@ async fn main() {
     init_logger();
     tracing::info!("PID {}", std::process::id());
     let args = Cli::parse();
-    if let Err(err) = App::run(&args.postgres_conn_string, &args.bind()).await {
+    if let Err(err) = App::run(
+        &args.postgres_conn_string,
+        &args.bind_string.unwrap_or("127.0.0.1:8080".into()),
+        args.conn_pool_size.unwrap_or(16),
+    )
+    .await
+    {
         eprintln!("{}", err);
     }
 }
@@ -52,13 +58,10 @@ pub struct Cli {
         help = "optional, default value is \"127.0.0.1:8080\""
     )]
     bind_string: Option<String>,
-}
-
-impl Cli {
-    fn bind(&self) -> String {
-        match &self.bind_string {
-            Some(bind) => bind.clone(),
-            None => "127.0.0.1:8080".into(),
-        }
-    }
+    #[arg(
+        long = "pg-pool-size",
+        value_name = "<size>",
+        help = "postgres connection pool size, optional, default value is 16"
+    )]
+    conn_pool_size: Option<usize>,
 }

@@ -1,13 +1,15 @@
-use crate::{controller_auth, controller_user, db_client};
+use crate::{controller_auth, controller_user, db};
 use axum::{routing, Router};
 use std::sync::Arc;
 
 pub struct App {}
 impl App {
-    pub async fn run(conn_string: &String, bind_string: &String) -> anyhow::Result<()> {
-        let db = Arc::new(tokio::sync::RwLock::new(
-            db_client::DB::new(conn_string).await?,
-        ));
+    pub async fn run(
+        conn_string: &str,
+        bind_string: &str,
+        pg_conn_size: usize,
+    ) -> anyhow::Result<()> {
+        let db = Arc::new(db::DB::new(conn_string, pg_conn_size).await?);
         let app = Router::new()
             .route("/login", routing::post(controller_auth::login))
             .route(
