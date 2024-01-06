@@ -14,6 +14,7 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 #[tokio::main]
 async fn main() {
     init_logger();
+    tracing::info!("PID {}", std::process::id());
     let args = Cli::parse();
     if let Err(err) = App::run(&args.postgres_conn_string, &args.bind()).await {
         eprintln!("{}", err);

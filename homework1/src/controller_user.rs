@@ -1,4 +1,4 @@
-use crate::{db_client, db_user, password::hash_password, schema};
+use crate::{controller, db_client, db_user, password::hash_password, schema};
 use axum::{extract, http::StatusCode, response::IntoResponse, Json};
 use chrono::Datelike;
 use std::sync::Arc;
@@ -8,36 +8,66 @@ pub async fn create_user(
     extract::State(db): extract::State<Arc<RwLock<db_client::DB>>>,
     Json(payload): Json<serde_json::Value>,
 ) -> impl IntoResponse {
-    match validate_create_user_request(&payload) {
-        Err(err) => (StatusCode::BAD_REQUEST, err.to_string()),
-        Ok(user) => {
-            let user: db_user::User = user.into();
-            match user.insert_to_db(&*db.read().await).await {
-                Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
-                Ok(id) => {
-                    tracing::info!("a new user registered with ID {}", id);
-                    (StatusCode::CREATED, id)
+    let response: (StatusCode, Json<serde_json::Value>) =
+        match validate_create_user_request(&payload) {
+            Err(err) => (
+                StatusCode::BAD_REQUEST,
+                serde_json::Value::from(controller::Error {
+                    message: err.to_string(),
+                })
+                .into(),
+            ),
+            Ok(user) => {
+                let user: db_user::User = user.into();
+                match user.insert_to_db(&*db.read().await).await {
+                    Err(err) => (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        serde_json::Value::from(controller::Error {
+                            message: err.to_string(),
+                        })
+                        .into(),
+                    ),
+                    Ok(user_id) => {
+                        tracing::info!("a new user registered with ID {}", user_id);
+                        (
+                            StatusCode::CREATED,
+                            serde_json::Value::from(CreateUserResponse { user_id }).into(),
+                        )
+                    }
                 }
             }
-        }
-    }
+        };
+
+    response
 }
 
 pub async fn get_user(
     extract::State(db): extract::State<Arc<RwLock<db_client::DB>>>,
     extract::Path(id): extract::Path<String>,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
-    match db_user::User::from_id(&id, &db.read().await.client).await {
-        Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string())),
-        Ok(user) => match user {
-            Some(user) => Ok((StatusCode::OK, Json::<GetUser>(user.into()))),
-            None => Err((StatusCode::NOT_FOUND, "not found".into())),
-        },
-    }
+) -> impl IntoResponse {
+    let response: (StatusCode, Json<serde_json::Value>) =
+        match db_user::User::from_id(&id, &db.read().await.client).await {
+            Err(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                serde_json::Value::from(controller::Error {
+                    message: err.to_string(),
+                })
+                .into(),
+            ),
+            Ok(user) => match user {
+                Some(dbuser) => (
+                    StatusCode::OK,
+                    serde_json::Value::from(GetUser::from(dbuser)).into(),
+                ),
+                None => (StatusCode::NOT_FOUND, serde_json::json!({}).into()),
+            },
+        };
+
+    response
 }
 
 #[derive(Debug, serde::Deserialize, Clone)]
-struct CreateUser {
+struct CreateUserRequest {
     first_name: String,
     second_name: String,
     biography: String,
@@ -46,14 +76,19 @@ struct CreateUser {
     password: String,
 }
 
-fn validate_create_user_request(payload: &serde_json::Value) -> anyhow::Result<CreateUser> {
+#[derive(Debug, serde::Serialize, Clone)]
+struct CreateUserResponse {
+    user_id: String,
+}
+
+fn validate_create_user_request(payload: &serde_json::Value) -> anyhow::Result<CreateUserRequest> {
     schema::validate(payload, &schema::USER_REGISTER)?;
-    let user: CreateUser = serde_json::from_value(payload.clone()).unwrap();
+    let user: CreateUserRequest = serde_json::from_value(payload.clone()).unwrap();
     user.validate()?;
     Ok(user)
 }
 
-impl CreateUser {
+impl CreateUserRequest {
     fn validate(&self) -> anyhow::Result<()> {
         let date_18_old = chrono::Local::now() - chrono::Months::new(12 * 18);
         let date_18_old = format!(
@@ -99,8 +134,20 @@ impl From<db_user::User> for GetUser {
     }
 }
 
-impl From<CreateUser> for db_user::User {
-    fn from(user: CreateUser) -> Self {
+impl From<CreateUserResponse> for serde_json::Value {
+    fn from(user: CreateUserResponse) -> Self {
+        serde_json::to_value(user).unwrap()
+    }
+}
+
+impl From<GetUser> for serde_json::Value {
+    fn from(user: GetUser) -> Self {
+        serde_json::to_value(user).unwrap()
+    }
+}
+
+impl From<CreateUserRequest> for db_user::User {
+    fn from(user: CreateUserRequest) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             first_name: user.first_name,

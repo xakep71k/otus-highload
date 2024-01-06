@@ -10,7 +10,10 @@ impl DB {
         let mut client = DB::create_client(conn_string).await?;
 
         let dbname = if need_create_db {
-            tracing::info!("database has not been specifed so let's create it");
+            tracing::info!(
+                "database has not been specifed so let's create it with name '{}'",
+                DBNAME
+            );
             if DB::is_db_exists(&client).await? {
                 tracing::info!(
                     "db with name '{}' already exists, so let's using it",

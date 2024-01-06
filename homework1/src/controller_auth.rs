@@ -16,10 +16,9 @@ struct Token {
     token: String,
 }
 
-impl Token {
-    #[allow(clippy::wrong_self_convention)]
-    fn to_value(self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap()
+impl From<Token> for serde_json::Value {
+    fn from(token: Token) -> Self {
+        serde_json::to_value(token).unwrap()
     }
 }
 
@@ -33,12 +32,13 @@ pub async fn login(
     extract::State(db): extract::State<Arc<RwLock<db_client::DB>>>,
     Json(payload): Json<serde_json::Value>,
 ) -> impl IntoResponse {
-    use db_user::UpdatedTokenResult;
-
     let response: (StatusCode, Json<serde_json::Value>) = match validate_login_request(&payload) {
         Err(err) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            controller::Error::new(err.to_string()).to_value().into(),
+            serde_json::Value::from(controller::Error {
+                message: err.to_string(),
+            })
+            .into(),
         ),
         Ok(login) => {
             match db_user::User::update_token(
@@ -50,28 +50,47 @@ pub async fn login(
             {
                 Err(err) => (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    controller::Error::new(err.to_string()).to_value().into(),
+                    serde_json::Value::from(controller::Error {
+                        message: err.to_string(),
+                    })
+                    .into(),
                 ),
-                Ok(result) => match result {
-                    UpdatedTokenResult::Ok(user) => (
-                        StatusCode::OK,
-                        Token { token: user.token }.to_value().into(),
-                    ),
-                    UpdatedTokenResult::UserNotFound => (
-                        StatusCode::NOT_FOUND,
-                        controller::Error::new("user not found".into())
-                            .to_value()
-                            .into(),
-                    ),
-                    UpdatedTokenResult::WrongPassword => (
-                        StatusCode::BAD_REQUEST,
-                        controller::Error::new("invalid data".into())
-                            .to_value()
-                            .into(),
-                    ),
-                },
+                Ok(result) => update_token_result_to_resonse(&login.user_id, result),
             }
         }
     };
     response
+}
+
+fn update_token_result_to_resonse(
+    user_id: &str,
+    result: db_user::UpdatedTokenResult,
+) -> (StatusCode, Json<serde_json::Value>) {
+    use db_user::UpdatedTokenResult;
+    match result {
+        UpdatedTokenResult::Ok(user) => {
+            tracing::error!("user with id '{}' has been login successfuly", user_id,);
+            (
+                StatusCode::OK,
+                serde_json::Value::from(Token { token: user.token }).into(),
+            )
+        }
+        UpdatedTokenResult::UserNotFound => {
+            tracing::error!("user with id '{}' not found", user_id);
+            (StatusCode::NOT_FOUND, serde_json::json!({}).into())
+        }
+        UpdatedTokenResult::WrongPassword => {
+            tracing::error!(
+                "user with id '{}' has been tried to login with wrong password",
+                user_id,
+            );
+            (
+                StatusCode::BAD_REQUEST,
+                serde_json::Value::from(controller::Error {
+                    message: "wrong password".into(),
+                })
+                .into(),
+            )
+        }
+    }
 }
