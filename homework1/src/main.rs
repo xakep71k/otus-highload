@@ -15,11 +15,12 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 async fn main() {
     init_logger();
     tracing::info!("PID {}", std::process::id());
-    let args = Cli::parse();
+    let args = Cli::parse().init_not_specified_opts();
+    tracing::info!("opts: {:?}", args);
     if let Err(err) = App::run(
         &args.postgres_conn_string,
-        &args.bind_string.unwrap_or("127.0.0.1:8080".into()),
-        args.conn_pool_size.unwrap_or(16),
+        &args.bind_string.unwrap(),
+        args.conn_pool_size.unwrap(),
     )
     .await
     {
@@ -64,4 +65,18 @@ pub struct Cli {
         help = "postgres connection pool size, optional, default value is 16"
     )]
     conn_pool_size: Option<usize>,
+}
+
+impl Cli {
+    fn init_not_specified_opts(mut self) -> Self {
+        if self.bind_string.is_none() {
+            self.bind_string = Some("127.0.0.1:8080".into());
+        }
+
+        if self.conn_pool_size.is_none() {
+            self.conn_pool_size = Some(16);
+        }
+
+        self
+    }
 }
