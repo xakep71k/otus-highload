@@ -37,7 +37,7 @@ fn init_logger() {
     version = env!("CARGO_PKG_VERSION"),
     author = "Aleksandr Bubnov\n",
     about = "*** OTUS Highload Architect course homework ***",
-    help_template = "{about}\nAuthor: {author}\nUse LOG_LEVEL=debug to see more detailed output\n{usage-heading} {usage}\n{all-args}{after-help}"
+    help_template = "{about}\nAuthor: {author}\nUse LOG_LEVEL=debug to see debug logging\n{usage-heading} {usage}\n{all-args}{after-help}"
 )]
 pub struct Cli {
     #[arg(
