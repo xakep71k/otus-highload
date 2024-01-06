@@ -61,7 +61,7 @@ pub struct Cli {
     bind_string: Option<String>,
     #[arg(
         long = "pg-pool-size",
-        value_name = "<size>",
+        value_name = "size",
         help = "postgres connection pool size, optional, default value is 16"
     )]
     conn_pool_size: Option<usize>,
