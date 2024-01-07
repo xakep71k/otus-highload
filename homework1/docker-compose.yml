@@ -1,0 +1,28 @@
+services:
+
+  db:
+    image: postgres:latest
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+
+  social-network:
+    image: aeuo/otus-highload:homework1
+    restart: always
+    environment:
+      POSTGRES_CONN_STRING: "host=db user=postgres"
+      BIND_STRING: "0.0.0.0:8080"
+    ports:
+      - 8080:8080
+    depends_on:
+      - db
+
+#
+# Пример, использования реализованного API
+#  
+# curl -v http://127.0.0.1:8080/user/register -H 'Content-Type: application/json' -d '{"first_name": "Рамзан", "second_name": "Кадыров", "birthdate": "1976-10-05", "biography": "IT", "city": "Грозный", "password": "нохча"}'
+#
+# regitster вернёт user ID, который нужно подставить в указанные ниже команды вместо <user ID>
+#
+# curl -v http://127.0.0.1:8080/user/get/<user ID>
+# curl -v http://127.0.0.1:8080/login -H 'Content-Type: application/json' -d '{"id": "<user ID>", "password": "нохча"}'
+#
