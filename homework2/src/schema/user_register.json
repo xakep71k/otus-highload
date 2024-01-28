@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "properties": {
+    "first_name": {
+      "type": "string",
+      "example": "Имя"
+    },
+    "second_name": {
+      "type": "string",
+      "example": "Фамилия"
+    },
+    "birthdate": {
+      "$ref": "#/$defs/BirthDate"
+    },
+    "biography": {
+      "type": "string",
+      "example": "Хобби, интересы и т.п."
+    },
+    "city": {
+      "type": "string",
+      "example": "Москва"
+    },
+    "password": {
+      "type": "string",
+      "example": "Секретная строка"
+    }
+  },
+  "$defs": {
+    "BirthDate": {
+      "type": "string",
+      "description": "Дата рождения",
+      "format": "date",
+      "example": "2017-02-01"
+    }
+  },
+  "additionalProperties": false,
+  "minProperties": 6
+}

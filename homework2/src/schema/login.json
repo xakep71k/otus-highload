@@ -1,0 +1,16 @@
+{
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "example": "e4d2e6b0-cde2-42c5-aac3-0b8316f21e58"
+      },
+      "password": {
+        "type": "string",
+        "example": "Фамилия"
+      }
+    },
+    "additionalProperties": false,
+    "minProperties": 2
+  }
+  
