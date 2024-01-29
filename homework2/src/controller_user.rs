@@ -1,6 +1,7 @@
 use crate::{controller, db, db_user, password::hash_password, schema};
 use axum::{extract, http::StatusCode, response::IntoResponse, Json};
 use chrono::Datelike;
+use serde::{Deserialize, Deserializer};
 use std::sync::Arc;
 use tokio_postgres::GenericClient;
 
@@ -76,6 +77,66 @@ pub async fn get_user(
         };
 
     response
+}
+
+pub async fn search_user(
+    extract::State(db): extract::State<Arc<db::DB>>,
+    extract::Query(params): extract::Query<UserSearchParams>,
+) -> impl IntoResponse {
+    tracing::debug!("search query: {params:?}");
+    let pg_pool = match db.get().await {
+        Err(err) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json::<serde_json::Value>(serde_json::Value::from(controller::Error {
+                    message: err.to_string(),
+                })),
+            )
+        }
+        Ok(object) => object,
+    };
+
+    let response: (StatusCode, Json<serde_json::Value>) = match db_user::User::search(
+        pg_pool.client(),
+        params.first_name.as_ref(),
+        params.second_name.as_ref(),
+    )
+    .await
+    {
+        Ok(result) => (StatusCode::OK, serde_json::to_value(result).unwrap().into()),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            serde_json::Value::from(controller::Error {
+                message: err.to_string(),
+            })
+            .into(),
+        ),
+    };
+
+    response
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UserSearchParams {
+    #[serde(default, deserialize_with = "empty_string_as_none")]
+    first_name: Option<String>,
+    #[serde(default, deserialize_with = "empty_string_as_none")]
+    second_name: Option<String>,
+}
+
+fn empty_string_as_none<'de, D, T>(de: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: std::str::FromStr,
+    T::Err: std::fmt::Display,
+{
+    let opt = Option::<String>::deserialize(de)?;
+    match opt.as_deref() {
+        None | Some("") => Ok(None),
+        Some(s) => std::str::FromStr::from_str(s)
+            .map_err(serde::de::Error::custom)
+            .map(Some),
+    }
 }
 
 #[derive(Debug, serde::Deserialize, Clone)]

@@ -12,11 +12,13 @@ impl App {
         let db = Arc::new(db::DB::new(conn_string, pg_conn_size).await?);
         let app = Router::new()
             .route("/login", routing::post(controller_auth::login))
-            .route(
-                "/user/register",
-                routing::post(controller_user::create_user),
+            .nest(
+                "/user",
+                Router::new()
+                    .route("/register", routing::post(controller_user::create_user))
+                    .route("/get/:id", routing::get(controller_user::get_user))
+                    .route("/search", routing::get(controller_user::search_user)),
             )
-            .route("/user/get/:id", routing::get(controller_user::get_user))
             .with_state(db);
         let listener = tokio::net::TcpListener::bind(bind_string).await.unwrap();
         axum::serve(listener, app)

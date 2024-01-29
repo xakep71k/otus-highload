@@ -1,6 +1,6 @@
 use crate::{db::DB, password};
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Debug)]
 pub struct User {
     pub id: String,
     pub first_name: String,
@@ -10,6 +10,29 @@ pub struct User {
     pub city: String,
     pub password_hash: String,
     pub token: String,
+}
+
+#[derive(serde::Serialize, Debug)]
+pub struct SearchResult {
+    pub id: String,
+    pub first_name: String,
+    pub second_name: String,
+    pub biography: String,
+    pub birthdate: String,
+    pub city: String,
+}
+
+impl From<User> for SearchResult {
+    fn from(user: User) -> Self {
+        Self {
+            id: user.id,
+            first_name: user.first_name,
+            second_name: user.second_name,
+            biography: user.biography,
+            birthdate: user.birthdate,
+            city: user.city,
+        }
+    }
 }
 
 impl User {
@@ -35,16 +58,52 @@ impl User {
         Ok(self.id)
     }
 
+    pub async fn search(
+        client: &tokio_postgres::Client,
+        first_name: Option<&String>,
+        second_name: Option<&String>,
+    ) -> anyhow::Result<Vec<SearchResult>> {
+        let stmt_both = "select * from users where first_name LIKE '$1%' and second_name LIKE $2";
+        let stmt_first_name = "select * from users where first_name LIKE $1";
+        let stmt_second_name = "select * from users where second_name LIKE $1";
+        let rows = if first_name.is_some() && second_name.is_some() {
+            #[allow(clippy::unnecessary_unwrap)]
+            let first_name = first_name.unwrap().to_owned() + "%";
+            #[allow(clippy::unnecessary_unwrap)]
+            let second_name = second_name.unwrap().to_owned() + "%";
+            client
+                .query(stmt_both, &[&first_name, &second_name])
+                .await
+        } else if let Some(first_name) = first_name {
+            let first_name = first_name.to_owned() + "%";
+            client.query(stmt_first_name, &[&first_name]).await
+        } else if let Some(second_name) = second_name {
+            let second_name = second_name.to_owned() + "%";
+            client.query(stmt_second_name, &[&second_name]).await
+        } else {
+            return Ok(vec![]);
+        }
+        .map_err(|e| anyhow::anyhow!("failed to search users: first_name={first_name:?} second_name={second_name:?}: {e:?}"))?;
+
+        let mut result: Vec<SearchResult> = Vec::with_capacity(rows.len());
+        for row in rows {
+            let user = User::from_row(&row);
+            result.push(user.into());
+        }
+
+        Ok(result)
+    }
+
     fn from_row(row: &tokio_postgres::Row) -> Self {
         Self {
             id: row.get(0),
             first_name: row.get(1),
             second_name: row.get(2),
             birthdate: row.get(3),
-            biography: row.get(4),
+            biography: row.try_get(4).unwrap_or("".into()),
             city: row.get(5),
-            password_hash: row.get(6),
-            token: row.get(7),
+            password_hash: row.try_get(6).unwrap_or("".into()),
+            token: row.try_get(7).unwrap_or("".into()),
         }
     }
 
