@@ -29,16 +29,9 @@ async fn main() {
                 tracing::error!("failed to run server: {err:?}");
             }
         }
-        Cli::FillDB(fill_args) => {
-            tracing::info!("opts: {fill_args:?}");
-            if let Err(err) = fill::run(
-                &fill_args.csv,
-                &fill_args.postgres_conn_string.unwrap_or(
-                    "host=localhost user=postgres dbname=highload_alexander_bubnov".into(),
-                ),
-            )
-            .await
-            {
+        Cli::GenerateInserts(args) => {
+            tracing::info!("opts: {args:?}");
+            if let Err(err) = generate_inserts::run(args.limit).await {
                 tracing::error!("failed to fill: {err:?}");
             }
         }
@@ -65,19 +58,13 @@ fn init_logger() {
 )]
 enum Cli {
     Server(ServerArgs),
-    FillDB(Fill),
+    GenerateInserts(GenerateInsert),
 }
 
 #[derive(clap::Args, Debug, Clone)]
-struct Fill {
-    #[arg(
-        long = "postgres-conn-string",
-        value_name = "string",
-        help = "for example, \"host=localhost user=postgres dbname=highload_alexander_bubnov\", to specify your own DB use dbname=your_db_name otherwise DB will be created"
-    )]
-    postgres_conn_string: Option<String>,
-    #[arg(long = "csv", value_name = "string", help = "for example, people.csv")]
-    csv: String,
+struct GenerateInsert {
+    #[arg(long = "limit", help = "limit of generated inserts")]
+    limit: usize,
 }
 
 #[derive(clap::Args, Debug, Clone)]

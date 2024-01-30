@@ -1,15 +1,12 @@
 [package]
-name = "fill"
+name = "generate_inserts"
 version = "1.0.0"
 edition = "2021"
 
 [dependencies]
 chrono = { workspace = true }
 anyhow = { workspace = true }
-serde_json = { workspace = true }
-reqwest = { workspace = true }
 tracing = { workspace = true }
-tokio-postgres = { workspace = true }
-tokio = { workspace = true }
 uuid = { workspace = true }
-
+random_name_generator = { workspace = true }
+rand = { workspace = true  }
